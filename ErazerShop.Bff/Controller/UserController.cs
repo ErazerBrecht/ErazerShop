@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ErazerShop.Bff.Controller
 {
@@ -8,8 +9,7 @@ namespace ErazerShop.Bff.Controller
         [Route("info")]
         public IActionResult GetUser()
         {
-            var user = new { name = User.Identity.Name };
-
+            var user = new {name = User.Identity.Name, email = User.Claims.SingleOrDefault(x => x.Type == "email")?.Value};
             return new JsonResult(user);
         }
 
