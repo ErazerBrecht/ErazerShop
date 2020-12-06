@@ -7,6 +7,7 @@
 <body>
 <div>
     <button id="login">Login</button>
+    <button id="redirect">Login with redirect</button>
 </div>
 
 <div>
@@ -15,9 +16,14 @@
 
 <script>
     document.getElementById("login").addEventListener("click", login);
+    document.getElementById("redirect").addEventListener("click", redirect);
 
     function login() {
         window.location = "/login";
+    }
+
+    function redirect() {
+        window.location = "/login?redirect=/test.html";
     }
 </script>
 

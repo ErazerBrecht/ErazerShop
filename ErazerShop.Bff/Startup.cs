@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Diagnostics.Eventing.Reader;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -72,16 +75,23 @@ namespace ErazerShop.Bff
             {
                 login.Run(async (context) =>
                 {
+                    var hasRedirectQueryParam =
+                        context.Request.Query.TryGetValue("redirect", out var redirectQueryParam);
+
                     if (!context.User.Identity.IsAuthenticated)
                     {
-                        await context.ChallengeAsync();
+                        var props = hasRedirectQueryParam
+                            ? new OpenIdConnectChallengeProperties {RedirectUri = $"/login?redirect={redirectQueryParam.First()}"}
+                            : null;
+
+                        await context.ChallengeAsync(props);
                         return;
                     }
 
-                    context.Response.Redirect("/admin");
+                    context.Response.Redirect(hasRedirectQueryParam ? $"/admin{redirectQueryParam}" : "/admin");
                 });
             });
-            
+
             app.Map("/api", api =>
             {
                 api.RunProxy(async context =>
@@ -93,9 +103,9 @@ namespace ErazerShop.Bff
 
                     var result = await forwardContext.Send();
 
-                    if (result.StatusCode != HttpStatusCode.Unauthorized) 
+                    if (result.StatusCode != HttpStatusCode.Unauthorized)
                         return result;
-                    
+
                     await context.SignOutAsync("cookies");
                     return new HttpResponseMessage(HttpStatusCode.Unauthorized);
                 });
