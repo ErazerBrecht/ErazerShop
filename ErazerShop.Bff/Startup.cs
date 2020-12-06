@@ -77,12 +77,19 @@ namespace ErazerShop.Bff
                 {
                     var hasRedirectQueryParam =
                         context.Request.Query.TryGetValue("redirect", out var redirectQueryParam);
-
-                    if (!context.User.Identity.IsAuthenticated)
+                    var hasPromptQueryParam = 
+                        context.Request.Query.TryGetValue("prompt", out var promptQueryParam);
+                    var prompt = hasPromptQueryParam && promptQueryParam == "login";
+                    
+                    if (!context.User.Identity.IsAuthenticated || prompt)
                     {
-                        var props = hasRedirectQueryParam
-                            ? new OpenIdConnectChallengeProperties {RedirectUri = $"/login?redirect={redirectQueryParam.First()}"}
-                            : null;
+                        var props = new OpenIdConnectChallengeProperties
+                        {
+                            Prompt = prompt ? "login" : null,
+                            RedirectUri = hasRedirectQueryParam
+                                ? $"/login?redirect={redirectQueryParam.First()}"
+                                : "/login"
+                        };
 
                         await context.ChallengeAsync(props);
                         return;

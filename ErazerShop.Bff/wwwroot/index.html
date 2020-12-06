@@ -8,6 +8,7 @@
 <div>
     <button id="login">Login</button>
     <button id="redirect">Login with redirect</button>
+    <button id="prompt">Login without using existing sso session</button>
 </div>
 
 <div>
@@ -17,6 +18,7 @@
 <script>
     document.getElementById("login").addEventListener("click", login);
     document.getElementById("redirect").addEventListener("click", redirect);
+    document.getElementById("prompt").addEventListener("click", prompt);
 
     function login() {
         window.location = "/login";
@@ -24,6 +26,10 @@
 
     function redirect() {
         window.location = "/login?redirect=/test.html";
+    }
+
+    function prompt() {
+        window.location = "/login?prompt=login";
     }
 </script>
 
