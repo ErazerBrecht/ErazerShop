@@ -2,7 +2,7 @@
 // See LICENSE in the project root for license information.
 
 
-using Duende.IdentityServer;
+using System;
 using ErazerShop.Idsrv.Data;
 using IdentityServerHost.Models;
 using Microsoft.AspNetCore.Builder;
@@ -17,13 +17,18 @@ namespace ErazerShop.Idsrv
 {
     public class Startup
     {
-        public IWebHostEnvironment Environment { get; }
-        public IConfiguration Configuration { get; }
+        private readonly IWebHostEnvironment _environment;
+        private readonly IConfiguration _configuration;
+        private readonly string _migrationsAssembly;
+        private readonly string _connectionString;
 
         public Startup(IWebHostEnvironment environment, IConfiguration configuration)
         {
-            Environment = environment;
-            Configuration = configuration;
+            _environment = environment;
+            _configuration = configuration;
+
+            _migrationsAssembly = typeof(Startup).Assembly.GetName().Name;
+            _connectionString = _configuration.GetConnectionString("DefaultConnection");
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -31,35 +36,36 @@ namespace ErazerShop.Idsrv
             services.AddControllersWithViews();
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"), 
-                    o => o.MigrationsAssembly(typeof(Startup).Assembly.FullName)));
+                options.UseNpgsql(_connectionString, o => o.MigrationsAssembly(_migrationsAssembly)));
 
             services.AddIdentity<ApplicationUser, IdentityRole>()
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
 
             var builder = services.AddIdentityServer(options =>
-            {
-                options.Events.RaiseErrorEvents = true;
-                options.Events.RaiseInformationEvents = true;
-                options.Events.RaiseFailureEvents = true;
-                options.Events.RaiseSuccessEvents = true;
-
-                // see https://identityserver4.readthedocs.io/en/latest/topics/resources.html
-                options.EmitStaticAudienceClaim = true;
-            })
+                {
+                    options.Events.RaiseErrorEvents = true;
+                    options.Events.RaiseInformationEvents = true;
+                    options.Events.RaiseFailureEvents = true;
+                    options.Events.RaiseSuccessEvents = true;
+                    options.Authentication.CookieLifetime = TimeSpan.FromHours(12);
+                    options.Authentication.CookieSlidingExpiration = true;
+                })
                 .AddInMemoryIdentityResources(Config.IdentityResources)
                 .AddInMemoryApiScopes(Config.ApiScopes)
                 .AddInMemoryApiResources(Config.ApiResources)
                 .AddInMemoryClients(Config.Clients)
-                .AddAspNetIdentity<ApplicationUser>();
+                .AddAspNetIdentity<ApplicationUser>()
+                .AddOperationalStore(options =>
+                    options.ConfigureDbContext = b =>
+                        b.UseNpgsql(_connectionString, o => o.MigrationsAssembly(_migrationsAssembly)));
 
             services.AddAuthentication();
         }
 
         public void Configure(IApplicationBuilder app)
         {
-            if (Environment.IsDevelopment())
+            if (_environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
@@ -69,10 +75,7 @@ namespace ErazerShop.Idsrv
             app.UseRouting();
             app.UseIdentityServer();
             app.UseAuthorization();
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapDefaultControllerRoute();
-            });
+            app.UseEndpoints(endpoints => { endpoints.MapDefaultControllerRoute(); });
         }
     }
 }

@@ -5,6 +5,7 @@
 using System;
 using System.Linq;
 using System.Security.Claims;
+using Duende.IdentityServer.EntityFramework.DbContexts;
 using IdentityModel;
 using ErazerShop.Idsrv.Data;
 using IdentityServerHost.Models;
@@ -19,21 +20,32 @@ namespace ErazerShop.Idsrv
     {
         public static void EnsureSeedData(string connectionString)
         {
+            var migrationsAssembly = (typeof(Startup).Assembly.FullName);
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddDbContext<ApplicationDbContext>(options =>
-               options.UseNpgsql(connectionString, o => o.MigrationsAssembly(typeof(Startup).Assembly.FullName)));
+               options.UseNpgsql(connectionString, o => o.MigrationsAssembly(migrationsAssembly)));
 
             services.AddIdentity<ApplicationUser, IdentityRole>()
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
 
+            services.AddIdentityServer()
+                .AddOperationalStore(options =>
+                    options.ConfigureDbContext = b =>
+                        b.UseNpgsql(connectionString, o => o.MigrationsAssembly(migrationsAssembly)));
+
             using (var serviceProvider = services.BuildServiceProvider())
             {
                 using (var scope = serviceProvider.GetRequiredService<IServiceScopeFactory>().CreateScope())
                 {
-                    var context = scope.ServiceProvider.GetService<ApplicationDbContext>();
-                    context.Database.Migrate();
+                    var appDbContext = scope.ServiceProvider.GetService<ApplicationDbContext>();
+                    appDbContext.Database.Migrate();
+                    Log.Debug("ApplicationDbContext migrated");
+
+                    var persistedGrantsDbContext = scope.ServiceProvider.GetService<PersistedGrantDbContext>();
+                    persistedGrantsDbContext.Database.Migrate();
+                    Log.Debug("PersistedGrantsDbContext migrated");
 
                     var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
                     var alice = userMgr.FindByNameAsync("alice").Result;
