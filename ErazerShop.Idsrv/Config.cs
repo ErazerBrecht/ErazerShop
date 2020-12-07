@@ -31,7 +31,7 @@ namespace ErazerShop.Idsrv
                     Scopes = {"erazershop.api"}
                 }
             };
-
+    
         public static IEnumerable<Client> Clients =>
             new Client[]
             {
@@ -45,6 +45,7 @@ namespace ErazerShop.Idsrv
                     RequireConsent = false,
 
                     RedirectUris = {"https://localhost:9999/signin-oidc"},
+                    PostLogoutRedirectUris = {"https://localhost:9999"},
 
                     AllowOfflineAccess = false,
                     AllowedScopes = {"openid", "profile", "email", "erazershop.api"},

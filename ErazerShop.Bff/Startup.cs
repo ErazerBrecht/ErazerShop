@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics.Eventing.Reader;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net;
@@ -8,8 +7,10 @@ using IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using ProxyKit;
 
@@ -51,6 +52,7 @@ namespace ErazerShop.Bff
                     options.ResponseType = "code";
                     options.GetClaimsFromUserInfoEndpoint = true;
                     options.SaveTokens = true;
+                    options.SignedOutCallbackPath = "https://localhost:9999";
 
                     options.Scope.Clear();
                     options.Scope.Add("openid");
@@ -66,9 +68,17 @@ namespace ErazerShop.Bff
                 });
         }
 
-        public void Configure(IApplicationBuilder app)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            app.UseDeveloperExceptionPage();
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+                app.UseSwaggerUI(x =>
+                {
+                    x.SwaggerEndpoint("https://localhost:5000/swagger/v1/swagger.json", "API");
+                });
+            }
+            
             app.UseAuthentication();
 
             app.Map("/login", login =>
