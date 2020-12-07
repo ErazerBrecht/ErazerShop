@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics.Eventing.Reader;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net;
@@ -8,8 +7,10 @@ using IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using ProxyKit;
 
@@ -66,21 +67,27 @@ namespace ErazerShop.Bff
                 });
         }
 
-        public void Configure(IApplicationBuilder app)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            app.UseDeveloperExceptionPage();
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+                app.UseSwaggerUI(x => { x.SwaggerEndpoint("/api/swagger/v1/swagger.json", "API"); });
+            }
+
             app.UseAuthentication();
 
             app.Map("/login", login =>
             {
                 login.Run(async (context) =>
                 {
-                    var hasRedirectQueryParam =
-                        context.Request.Query.TryGetValue("redirect", out var redirectQueryParam);
-                    var hasPromptQueryParam = 
-                        context.Request.Query.TryGetValue("prompt", out var promptQueryParam);
+                    var req = context.Request;
+                    var res = context.Response;
+
+                    var hasRedirectQueryParam = req.Query.TryGetValue("redirect", out var redirectQueryParam);
+                    var hasPromptQueryParam = req.Query.TryGetValue("prompt", out var promptQueryParam);
                     var prompt = hasPromptQueryParam && promptQueryParam == "login";
-                    
+
                     if (!context.User.Identity.IsAuthenticated || prompt)
                     {
                         var props = new OpenIdConnectChallengeProperties
@@ -95,7 +102,7 @@ namespace ErazerShop.Bff
                         return;
                     }
 
-                    context.Response.Redirect(hasRedirectQueryParam ? $"/admin{redirectQueryParam}" : "/admin");
+                    res.Redirect(hasRedirectQueryParam ? $"/admin{redirectQueryParam}" : "/admin");
                 });
             });
 
@@ -103,7 +110,9 @@ namespace ErazerShop.Bff
             {
                 api.RunProxy(async context =>
                 {
-                    var forwardContext = context.ForwardTo("https://localhost:5000");
+                    var forwardContext = context
+                        .ForwardTo("https://localhost:5000")
+                        .AddXForwardedHeaders();
 
                     var token = await context.GetUserAccessTokenAsync();
                     forwardContext.UpstreamRequest.SetBearerToken(token);
