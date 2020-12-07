@@ -14,7 +14,7 @@ namespace ErazerShop.Idsrv
             {
                 new IdentityResources.OpenId(),
                 new IdentityResources.Profile(),
-                new IdentityResources.Email() 
+                new IdentityResources.Email()
             };
 
         public static IEnumerable<ApiScope> ApiScopes =>
@@ -31,7 +31,7 @@ namespace ErazerShop.Idsrv
                     Scopes = {"erazershop.api"}
                 }
             };
-    
+
         public static IEnumerable<Client> Clients =>
             new Client[]
             {
@@ -48,7 +48,7 @@ namespace ErazerShop.Idsrv
 
                     AllowOfflineAccess = false,
                     AllowedScopes = {"openid", "profile", "email", "erazershop.api"},
-                    
+
                     AccessTokenLifetime = 1800
                 },
             };
