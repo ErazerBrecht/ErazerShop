@@ -1,0 +1,14 @@
+version: '3.4'
+
+services:
+  erazershop-sql:
+    image: postgres
+    restart: always
+    volumes: 
+      - erazershop-sql-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "@Passw0rd"
+    ports:
+      - 5432:5432
+volumes:
+  erazershop-sql-data:
