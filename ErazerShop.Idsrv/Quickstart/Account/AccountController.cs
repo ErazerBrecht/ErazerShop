@@ -8,7 +8,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Threading.Tasks;
 using Duende.IdentityServer.Events;
 using Duende.IdentityServer.Extensions;
@@ -16,6 +18,7 @@ using Duende.IdentityServer.Models;
 using Duende.IdentityServer.Services;
 using Duende.IdentityServer.Stores;
 using IdentityServerHost.Models;
+using SignInResult = Microsoft.AspNetCore.Identity.SignInResult;
 
 namespace IdentityServerHost.Quickstart.UI
 {
@@ -50,17 +53,9 @@ namespace IdentityServerHost.Quickstart.UI
         /// Entry point into the login workflow
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Login(string returnUrl)
+        public IActionResult Login(string returnUrl)
         {
-            // build a model so we know what to show on the login page
-            var vm = await BuildLoginViewModelAsync(returnUrl);
-
-            if (vm.IsExternalLoginOnly)
-            {
-                // we only have one option for logging in and it's an external provider
-                return RedirectToAction("Challenge", "External", new { scheme = vm.ExternalLoginScheme, returnUrl });
-            }
-
+            var vm = new LoginInputModel {ReturnUrl = returnUrl};
             return View(vm);
         }
 
@@ -94,20 +89,67 @@ namespace IdentityServerHost.Quickstart.UI
 
                     return Redirect(model.ReturnUrl);
                 }
-                else
-                {
-                    // since we don't have a valid context, then we just go back to the home page
-                    return Redirect("~/");
-                }
+
+                // since we don't have a valid context, then we just go back to the home page
+                return Redirect("~/");
             }
 
             if (ModelState.IsValid)
             {
-                var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, model.RememberLogin, lockoutOnFailure: true);
+                var mail = new MailAddress(model.Email);
+                var host = mail.Host?.ToLowerInvariant();
+                
+                // TODO Get from DB
+                var externalProviders = new List<ExternalProvider>
+                {
+                    new ExternalProvider
+                    {
+                        Hosts = { "erazerbrecht.onmicrosoft.com", "intigriti.com" },
+                        AuthenticationScheme = "BrechtAzureAD",
+                        DisplayName = "AzureAD Brecht"
+                    },
+                    new ExternalProvider
+                    {
+                        Hosts = {"itirgitni.space"},
+                        AuthenticationScheme = "ArneAzureAD",
+                        DisplayName = "AzureAD Arne"
+                    },
+                };
+
+                if (externalProviders.SelectMany(x => x.Hosts).Contains(host))
+                {
+                    var externalProvider = externalProviders.Single(x => x.Hosts.Contains(host));
+                    return RedirectToAction("Challenge", "External", new {scheme = externalProvider.AuthenticationScheme, model.ReturnUrl});
+                }
+                
+                return View("LocalLogin", new LocalLoginInputModel {Email = model.Email, ReturnUrl = model.ReturnUrl});
+            }
+
+            // something went wrong, show form with error
+            return View(model);
+        }
+
+        /// <summary>
+        /// Handle postback from username/password login
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LocalLogin(LocalLoginInputModel model)
+        {
+            // check if we are in the context of an authorization request
+            var context = await _interaction.GetAuthorizationContextAsync(model.ReturnUrl);
+
+            if (ModelState.IsValid)
+            {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+                var result = user == null
+                    ? SignInResult.Failed
+                    : await _signInManager.PasswordSignInAsync(user, model.Password, model.RememberLogin, true);
+
                 if (result.Succeeded)
                 {
-                    var user = await _userManager.FindByNameAsync(model.Username);
-                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.UserName, user.Id, user.UserName, clientId: context?.Client.ClientId));
+                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.UserName, user.Id, user.UserName,
+                        clientId: context?.Client.ClientId));
 
                     if (context != null)
                     {
@@ -127,27 +169,26 @@ namespace IdentityServerHost.Quickstart.UI
                     {
                         return Redirect(model.ReturnUrl);
                     }
-                    else if (string.IsNullOrEmpty(model.ReturnUrl))
+
+                    if (string.IsNullOrEmpty(model.ReturnUrl))
                     {
                         return Redirect("~/");
                     }
-                    else
-                    {
-                        // user might have clicked on a malicious link - should be logged
-                        throw new Exception("invalid return URL");
-                    }
+
+                    // user might have clicked on a malicious link - should be logged
+                    throw new Exception("invalid return URL");
                 }
 
-                await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials", clientId:context?.Client.ClientId));
+                await _events.RaiseAsync(new UserLoginFailureEvent(model.Email, "invalid credentials",
+                    clientId: context?.Client.ClientId));
                 ModelState.AddModelError(string.Empty, AccountOptions.InvalidCredentialsErrorMessage);
             }
 
             // something went wrong, show form with error
-            var vm = await BuildLoginViewModelAsync(model);
-            return View(vm);
+            return View(model);
         }
 
-        
+
         /// <summary>
         /// Show logout page
         /// </summary>
@@ -192,10 +233,10 @@ namespace IdentityServerHost.Quickstart.UI
                 // build a return URL so the upstream provider will redirect back
                 // to us after the user has logged out. this allows us to then
                 // complete our single sign-out processing.
-                string url = Url.Action("Logout", new { logoutId = vm.LogoutId });
+                string url = Url.Action("Logout", new {logoutId = vm.LogoutId});
 
                 // this triggers a redirect to the external provider for sign-out
-                return SignOut(new AuthenticationProperties { RedirectUri = url }, vm.ExternalAuthenticationScheme);
+                return SignOut(new AuthenticationProperties {RedirectUri = url}, vm.ExternalAuthenticationScheme);
             }
 
             return View("LoggedOut", vm);
@@ -211,75 +252,9 @@ namespace IdentityServerHost.Quickstart.UI
         /*****************************************/
         /* helper APIs for the AccountController */
         /*****************************************/
-        private async Task<LoginViewModel> BuildLoginViewModelAsync(string returnUrl)
-        {
-            var context = await _interaction.GetAuthorizationContextAsync(returnUrl);
-            if (context?.IdP != null && await _schemeProvider.GetSchemeAsync(context.IdP) != null)
-            {
-                var local = context.IdP == Duende.IdentityServer.IdentityServerConstants.LocalIdentityProvider;
-
-                // this is meant to short circuit the UI and only trigger the one external IdP
-                var vm = new LoginViewModel
-                {
-                    EnableLocalLogin = local,
-                    ReturnUrl = returnUrl,
-                    Username = context?.LoginHint,
-                };
-
-                if (!local)
-                {
-                    vm.ExternalProviders = new[] { new ExternalProvider { AuthenticationScheme = context.IdP } };
-                }
-
-                return vm;
-            }
-
-            var schemes = await _schemeProvider.GetAllSchemesAsync();
-
-            var providers = schemes
-                .Where(x => x.DisplayName != null)
-                .Select(x => new ExternalProvider
-                {
-                    DisplayName = x.DisplayName ?? x.Name,
-                    AuthenticationScheme = x.Name
-                }).ToList();
-
-            var allowLocal = true;
-            if (context?.Client.ClientId != null)
-            {
-                var client = await _clientStore.FindEnabledClientByIdAsync(context.Client.ClientId);
-                if (client != null)
-                {
-                    allowLocal = client.EnableLocalLogin;
-
-                    if (client.IdentityProviderRestrictions != null && client.IdentityProviderRestrictions.Any())
-                    {
-                        providers = providers.Where(provider => client.IdentityProviderRestrictions.Contains(provider.AuthenticationScheme)).ToList();
-                    }
-                }
-            }
-
-            return new LoginViewModel
-            {
-                AllowRememberLogin = AccountOptions.AllowRememberLogin,
-                EnableLocalLogin = allowLocal && AccountOptions.AllowLocalLogin,
-                ReturnUrl = returnUrl,
-                Username = context?.LoginHint,
-                ExternalProviders = providers.ToArray()
-            };
-        }
-
-        private async Task<LoginViewModel> BuildLoginViewModelAsync(LoginInputModel model)
-        {
-            var vm = await BuildLoginViewModelAsync(model.ReturnUrl);
-            vm.Username = model.Username;
-            vm.RememberLogin = model.RememberLogin;
-            return vm;
-        }
-
         private async Task<LogoutViewModel> BuildLogoutViewModelAsync(string logoutId)
         {
-            var vm = new LogoutViewModel { LogoutId = logoutId, ShowLogoutPrompt = AccountOptions.ShowLogoutPrompt };
+            var vm = new LogoutViewModel {LogoutId = logoutId, ShowLogoutPrompt = AccountOptions.ShowLogoutPrompt};
 
             if (User?.Identity.IsAuthenticated != true)
             {
