@@ -1,0 +1,9 @@
+version: '3.4'
+
+services:
+  erazershop.web.public:
+    build:
+      context: .
+      dockerfile: dockerfile.public
+    ports:
+      - "4000:4000"

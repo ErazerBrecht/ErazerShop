@@ -1,0 +1,5 @@
+FROM node:14
+WORKDIR /app
+COPY  /dist/public .
+EXPOSE 4000
+ENTRYPOINT ["node", "./main.js"]
