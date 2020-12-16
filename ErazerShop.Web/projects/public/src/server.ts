@@ -60,7 +60,7 @@ if (moduleFilename === __filename || moduleFilename.includes('iisnode')) {
   run();
 }
 
-function log(req: express.Request, res: express.Response, next: express.NextFunction) {
+function log(req: express.Request, res: express.Response, next: express.NextFunction): void {
   return morgan('short')(req, res, next);
 }
 

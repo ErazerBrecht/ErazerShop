@@ -2,12 +2,16 @@
   "name": "erazer-shop-web",
   "version": "0.0.0",
   "scripts": {
+    "cpy": "cpy",
     "ng": "ng",
     "lint": "ng lint",
     "start:public": "ng run public:serve",
     "start-ssr:public": "ng run public:serve-ssr",
-    "build:public": "ng run public:server:production && ng build --prod",
-    "release:public": "npm install & npm run build:public & docker build -f Dockerfile.public ."
+    "build:public": "ng run public:server:production && ng build public --prod",
+    "release:public": "rimraf ./dist/public && npm install && npm run build:public && docker build -f dockerfile.public .",
+    "start:admin": "ng run admin:serve --port 4201",
+    "build:admin": "ng build admin --prod",
+    "release:admin": "rimraf ./dist/admin && npm install && npm run build:admin && cpy ./projects/admin/nginx.conf ./dist/admin/ && docker build -f dockerfile.admin ."
   },
   "private": true,
   "dependencies": {
@@ -36,6 +40,8 @@
     "@types/morgan": "~1.9.2",
     "@types/node": "~12.11.1",
     "codelyzer": "~6.0.0",
+    "cpy-cli": "^3.1.1",
+    "rimraf": "^3.0.2",
     "ts-node": "~8.3.0",
     "tslint": "~6.1.0",
     "typescript": "~4.1.2"

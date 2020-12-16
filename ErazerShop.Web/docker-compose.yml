@@ -7,3 +7,9 @@ services:
       dockerfile: dockerfile.public
     ports:
       - "4000:4000"
+  erazershop.web.admin:
+    build:
+      context: .
+      dockerfile: dockerfile.admin
+    ports:
+      - "4001:4001"
