@@ -31,6 +31,13 @@ namespace ErazerShop.Bff
             services.AddControllers();
             services.AddDistributedMemoryCache();
 
+            services.AddCors(o => o.AddPolicy("DevPolicy", builder =>
+            {
+                builder.WithOrigins("http://localhost:4201", "http://localhost:4001", "https://localhost:9999")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+            }));
+            
             services.AddAuthentication(options =>
                 {
                     options.DefaultScheme = "cookies";
@@ -75,7 +82,15 @@ namespace ErazerShop.Bff
                 app.UseSwaggerUI(x => { x.SwaggerEndpoint("/api/swagger/v1/swagger.json", "API"); });
             }
 
+            app.UseCors("DevPolicy");
             app.UseAuthentication();
+            app.UseRouting();
+            app.UseAuthorization();
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers()
+                    .RequireAuthorization();
+            });
 
             app.Map("/login", login =>
             {
@@ -106,6 +121,7 @@ namespace ErazerShop.Bff
                 });
             });
 
+            // API Proxy
             app.Map("/api", api =>
             {
                 api.RunProxy(async context =>
@@ -126,17 +142,28 @@ namespace ErazerShop.Bff
                     return new HttpResponseMessage(HttpStatusCode.Unauthorized);
                 });
             });
-
-            app.UseProtectedStaticFiles();
-            app.UseRouting();
-
-            app.UseAuthentication();
-            app.UseAuthorization();
-
-            app.UseEndpoints(endpoints =>
+            
+            // Admin web Proxy
+            app.Map("/admin", web =>
             {
-                endpoints.MapControllers()
-                    .RequireAuthorization();
+                web.RunProxy(async context =>
+                {
+                    var forwardContext = context
+                        .ForwardTo("http://localhost:4001")
+                        .AddXForwardedHeaders();
+
+                    return await forwardContext.Send();
+                });
+            });
+
+            // Public Web Proxy
+            app.RunProxy(async context =>
+            {
+                var forwardContext = context
+                    .ForwardTo("http://localhost:4000")
+                    .AddXForwardedHeaders();
+
+                return await forwardContext.Send();
             });
         }
     }
