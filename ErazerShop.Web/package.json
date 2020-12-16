@@ -10,7 +10,7 @@
     "build:public": "ng run public:server:production && ng build public --prod",
     "release:public": "rimraf ./dist/public && npm install && npm run build:public && docker build -f dockerfile.public .",
     "start:admin": "ng run admin:serve --port 4201",
-    "build:admin": "ng build admin --prod",
+    "build:admin": "ng build admin --prod --base-href /admin/",
     "release:admin": "rimraf ./dist/admin && npm install && npm run build:admin && cpy ./projects/admin/nginx.conf ./dist/admin/ && docker build -f dockerfile.admin ."
   },
   "private": true,
