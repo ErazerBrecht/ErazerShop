@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -18,9 +19,14 @@ namespace ErazerShop.Bff
 {
     public class Startup
     {
-        public Startup()
+        private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _env;
+
+        public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));;
+            _env = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -31,11 +37,12 @@ namespace ErazerShop.Bff
             services.AddControllers();
             services.AddDistributedMemoryCache();
 
-            services.AddCors(o => o.AddPolicy("DevPolicy", builder =>
+            services.AddCors(o => o.AddDefaultPolicy(builder =>
             {
-                builder.WithOrigins("http://localhost:4201", "http://localhost:4001", "https://localhost:9999")
+                builder.WithOrigins(_configuration.GetSection("CorsOrigins").Get<string[]>())
                     .AllowAnyMethod()
-                    .AllowAnyHeader();
+                    .AllowAnyHeader()
+                    .AllowCredentials();
             }));
             
             services.AddAuthentication(options =>
@@ -46,7 +53,7 @@ namespace ErazerShop.Bff
                 .AddCookie("cookies", options =>
                 {
                     options.Cookie.Name = "ErazerShop.Bff";
-                    options.Cookie.SameSite = SameSiteMode.Strict;
+                    options.Cookie.SameSite = _env.IsDevelopment() ? SameSiteMode.None : SameSiteMode.Strict;
                     options.ExpireTimeSpan = TimeSpan.FromSeconds(1500);
                     options.SlidingExpiration = false;
                 })
@@ -74,15 +81,15 @@ namespace ErazerShop.Bff
                 });
         }
 
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app)
         {
-            if (env.IsDevelopment())
+            if (_env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwaggerUI(x => { x.SwaggerEndpoint("/api/swagger/v1/swagger.json", "API"); });
             }
 
-            app.UseCors("DevPolicy");
+            app.UseCors();
             app.UseAuthentication();
             app.UseRouting();
             app.UseAuthorization();
