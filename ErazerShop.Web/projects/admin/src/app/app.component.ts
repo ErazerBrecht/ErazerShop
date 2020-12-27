@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Component } from '@angular/core';
-import { merge, Subject } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { merge, of, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
+import { AppConfigService } from './app.config';
 
 @Component({
   selector: 'app-root',
@@ -14,13 +15,13 @@ export class AppComponent {
   public backEndPushed$ = new Subject<void>();
 
   private onFrontEndPushed$ = this.frontEndPushed$.pipe(
-    switchMap(() => this.http.get('https://localhost:9999/user/info')));
+    switchMap(() => this.http.get(`${this.appConfig.config.api}/user/info`, { withCredentials: true }).pipe(catchError(x => of(x.message)))));
   private onBackEndPushed$ = this.backEndPushed$.pipe(
-    switchMap(() => this.http.get('https://localhost:9999/api/WeatherForecast')));
+    switchMap(() => this.http.get(`${this.appConfig.config.api}/api/WeatherForecast`, { withCredentials: true }).pipe(catchError(x => of(x.message)))));
 
   public result$ = merge(this.onFrontEndPushed$, this.onBackEndPushed$);
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private appConfig: AppConfigService) {
   }
 
 }
