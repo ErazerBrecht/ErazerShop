@@ -4,7 +4,8 @@ import { BrowserModule } from '@angular/platform-browser';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
-import { ConfigInitialzer } from './app.initializer';
+import { AuthHttpInterceptor } from './auth/auth.interceptor';
+import { ErazerShopInitializer } from './initializer/app.initializer';
 
 @NgModule({
   declarations: [
@@ -16,7 +17,8 @@ import { ConfigInitialzer } from './app.initializer';
     HttpClientModule
   ],
   providers: [
-    ConfigInitialzer
+    ErazerShopInitializer,
+    AuthHttpInterceptor
   ],
   bootstrap: [AppComponent]
 })

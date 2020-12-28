@@ -2,6 +2,7 @@
 // See LICENSE in the project root for license information.
 
 
+using System;
 using Duende.IdentityServer.Models;
 using System.Collections.Generic;
 
@@ -49,7 +50,18 @@ namespace ErazerShop.Idsrv
                     AllowOfflineAccess = false,
                     AllowedScopes = {"openid", "profile", "email", "erazershop.api"},
 
-                    AccessTokenLifetime = 1800
+                    AccessTokenLifetime = (int) TimeSpan.FromMinutes(30).TotalSeconds
+                },
+                new Client
+                {
+                    ClientId = "erazershop.dev",
+                    ClientSecrets = {new Secret("209839E0-6F18-4283-A798-A1458CD1F875".Sha256())},
+
+                    AllowedGrantTypes = GrantTypes.ResourceOwnerPassword,
+                    AllowOfflineAccess = false,
+                    AllowedScopes = {"openid", "profile", "email", "erazershop.api"},
+
+                    AccessTokenLifetime = (int) TimeSpan.FromDays(7).TotalSeconds
                 },
             };
     }

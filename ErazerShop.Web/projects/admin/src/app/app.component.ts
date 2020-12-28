@@ -15,9 +15,9 @@ export class AppComponent {
   public backEndPushed$ = new Subject<void>();
 
   private onFrontEndPushed$ = this.frontEndPushed$.pipe(
-    switchMap(() => this.http.get(`${this.appConfig.config.api}/user/info`, { withCredentials: true }).pipe(catchError(x => of(x.message)))));
+    switchMap(() => this.http.get(`${this.appConfig.config.api}/user/info`).pipe(catchError(x => of(x.message)))));
   private onBackEndPushed$ = this.backEndPushed$.pipe(
-    switchMap(() => this.http.get(`${this.appConfig.config.api}/api/WeatherForecast`, { withCredentials: true }).pipe(catchError(x => of(x.message)))));
+    switchMap(() => this.http.get(`${this.appConfig.config.api}/api/WeatherForecast`).pipe(catchError(x => of(x.message)))));
 
   public result$ = merge(this.onFrontEndPushed$, this.onBackEndPushed$);
 

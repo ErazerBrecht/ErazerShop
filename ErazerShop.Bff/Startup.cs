@@ -1,8 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Mime;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using ErazerShop.Bff.Middleware;
+using ErazerShop.Bff.Model;
 using IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -12,6 +19,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using ProxyKit;
 
@@ -25,7 +33,8 @@ namespace ErazerShop.Bff
         public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));;
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            ;
             _env = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
@@ -44,7 +53,7 @@ namespace ErazerShop.Bff
                     .AllowAnyHeader()
                     .AllowCredentials();
             }));
-            
+
             services.AddAuthentication(options =>
                 {
                     options.DefaultScheme = "cookies";
@@ -93,39 +102,12 @@ namespace ErazerShop.Bff
             app.UseAuthentication();
             app.UseRouting();
             app.UseAuthorization();
+            app.UseLogin(_env);
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers()
                     .RequireAuthorization();
-            });
-
-            app.Map("/login", login =>
-            {
-                login.Run(async (context) =>
-                {
-                    var req = context.Request;
-                    var res = context.Response;
-
-                    var hasRedirectQueryParam = req.Query.TryGetValue("redirect", out var redirectQueryParam);
-                    var hasPromptQueryParam = req.Query.TryGetValue("prompt", out var promptQueryParam);
-                    var prompt = hasPromptQueryParam && promptQueryParam == "login";
-
-                    if (!context.User.Identity.IsAuthenticated || prompt)
-                    {
-                        var props = new OpenIdConnectChallengeProperties
-                        {
-                            Prompt = prompt ? "login" : null,
-                            RedirectUri = hasRedirectQueryParam
-                                ? $"/login?redirect={redirectQueryParam.First()}"
-                                : "/login"
-                        };
-
-                        await context.ChallengeAsync(props);
-                        return;
-                    }
-
-                    res.Redirect(hasRedirectQueryParam ? $"/admin{redirectQueryParam}" : "/admin");
-                });
             });
 
             // API Proxy
@@ -149,10 +131,19 @@ namespace ErazerShop.Bff
                     return new HttpResponseMessage(HttpStatusCode.Unauthorized);
                 });
             });
-            
+
             // Admin web Proxy
             app.Map("/admin", web =>
             {
+                web.MapWhen(context => context.User.Identity?.IsAuthenticated != true, anon =>
+                {
+                    anon.Run(context =>
+                    {
+                        context.Response.Redirect("/");
+                        return Task.CompletedTask;
+                    });
+                });
+
                 web.RunProxy(async context =>
                 {
                     var forwardContext = context
