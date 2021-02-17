@@ -1,5 +1,3 @@
-using ErazerShop.Bff.ProtectedFolder;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using ProxyKit;
 
@@ -7,15 +5,6 @@ namespace ErazerShop.Bff
 {
     public static class Extensions
     {
-        public static IApplicationBuilder UseProtectedStaticFiles(this IApplicationBuilder app)
-        {
-            app.UseDefaultFiles();
-            app.UseMiddleware<ProtectedFolderMiddleware>("/admin");
-            app.UseStaticFiles();
-
-            return app;
-        }
-
         /// <summary>
         ///     Adds X-Forwarded-For, X-Forwarded-Host, X-Forwarded-Proto and
         ///     X-Forwarded-PathBase headers to the forward request context. If
